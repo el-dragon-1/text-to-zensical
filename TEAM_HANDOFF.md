@@ -1,74 +1,80 @@
 # Team Handoff: Text to Zensical Docker Release
 
-This runbook is for publishing and consuming the Text to Zensical container image.
+This runbook covers publishing and team deployment for Text to Zensical.
 
-## Publisher Workflow (Build + Push)
+## Publisher Workflow (Recommended)
 
-### 1) Set release variables
+### 1) Update release version
+
+Edit the `VERSION` file using semantic version format:
+
+- `1.0.2` or `v1.0.2`
+
+### 2) Commit and push to main
+
+The GitHub Actions workflow publishes both:
+
+- `ghcr.io/el-dragon-1/text-to-zensical:vX.Y.Z`
+- `ghcr.io/el-dragon-1/text-to-zensical:latest`
+
+The published image is multi-architecture:
+
+- `linux/amd64`
+- `linux/arm64`
+
+### 3) Verify published image (optional)
+
+```bash
+docker buildx imagetools inspect ghcr.io/el-dragon-1/text-to-zensical:vX.Y.Z
+```
+
+## Publisher Workflow (Manual Fallback)
+
+Use this only if GitHub Actions is unavailable.
 
 ```bash
 cd /Users/davidpolizzi/Development/docker/text-to-zensical
 
-export GH_OWNER=<your-org-or-user>
+export GH_OWNER=el-dragon-1
 export IMAGE=ghcr.io/${GH_OWNER}/text-to-zensical
-export TAG=v1.0.0
-```
-
-### 2) Authenticate to GHCR
-
-```bash
-# Option A: interactive
+export TAG=vX.Y.Z
 
 docker login ghcr.io
-
-# Option B: token from env var
-# export GHCR_USER=<github-username>
-# export GHCR_TOKEN=<github-personal-access-token-with-package-write>
-# echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+docker buildx build \
+	--platform linux/amd64,linux/arm64 \
+	-t "${IMAGE}:${TAG}" \
+	-t "${IMAGE}:latest" \
+	--push \
+	.
 ```
 
-### 3) Build and push
+## Team Consumer Workflow (Simple)
 
-```bash
-docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:latest" .
-docker push "${IMAGE}:${TAG}"
-docker push "${IMAGE}:latest"
-```
+### Required files
 
-### 4) Verify published tags
+- `docker-compose.release.yml`
+- `.env` (copy from `.env.team.example`)
 
-```bash
-docker pull "${IMAGE}:${TAG}"
-docker pull "${IMAGE}:latest"
-```
-
-## Team Consumer Workflow (Pull + Run)
-
-### 1) Get runtime files
-
-Required files:
-- docker-compose.release.yml
-- .env.team.example (copy to .env)
-
-### 2) Configure env
+### 1) Create `.env`
 
 ```bash
 cp .env.team.example .env
 ```
 
-Edit .env:
-- TEXT_TO_ZENSICAL_IMAGE=ghcr.io/<owner>/text-to-zensical
-- TEXT_TO_ZENSICAL_TAG=v1.0.0
-- SECRET_KEY=<strong-random-secret>
-- PORT=10253 (or your preferred host port)
+Update only these values if needed:
 
-### 3) Start service
+- `TEXT_TO_ZENSICAL_IMAGE=ghcr.io/el-dragon-1/text-to-zensical`
+- `TEXT_TO_ZENSICAL_TAG=latest`
+- `SECRET_KEY=<strong-random-secret>`
+- `PORT=10253`
+
+### 2) Start
 
 ```bash
 docker compose -f docker-compose.release.yml up -d
 ```
 
-### 4) Validate
+### 3) Validate
 
 ```bash
 docker compose -f docker-compose.release.yml ps
@@ -76,20 +82,28 @@ curl -I http://localhost:10253
 ```
 
 Open in browser:
-- http://localhost:10253
 
-### 5) Stop/update
+- `http://localhost:10253`
+
+### 4) Stop
 
 ```bash
 docker compose -f docker-compose.release.yml down
-
-# Update to a new image tag:
-# 1) edit .env TEXT_TO_ZENSICAL_TAG
-# 2) docker compose -f docker-compose.release.yml up -d
 ```
 
-## Recommended Release Practice
+## One-Command Option For Non-Technical Users
 
-- Use immutable version tags for production (v1.0.0, v1.0.1, etc).
-- Keep latest as convenience only.
-- Pin TEXT_TO_ZENSICAL_TAG in team .env files to avoid unplanned changes.
+If you distribute a folder where `docker-compose.release.yml` is renamed to `docker-compose.yml`, users can run:
+
+```bash
+docker compose up -d
+```
+
+## Persistence Across Upgrades
+
+Project data is persisted on the host in `./exports` via a bind mount. Updating image tags does not remove existing data as long as the same deployment folder and mount path are retained.
+
+## Release Practice
+
+- `latest` is easiest for non-technical users.
+- Pin explicit tags (`vX.Y.Z`) for controlled rollouts and rollback.

@@ -52,6 +52,9 @@ Use Docker image distribution as the default sharing model.
 ### 2) Environment Template And Security Defaults
 
 - Copy `.env.example` to `.env`.
+- `TEXT_TO_ZENSICAL_TAG` defaults to `latest` in templates for easiest team onboarding.
+- Data persistence is stored in the host-mounted `./exports` folder and remains available across image upgrades when that mount path is unchanged.
+- Pin a version tag instead of `latest` if you need strict reproducibility or rollback control.
 - Set a strong `SECRET_KEY` before sharing or deployment.
 - The release compose file includes lightweight container hardening:
   - `no-new-privileges`
