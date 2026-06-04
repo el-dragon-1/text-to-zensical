@@ -30,16 +30,16 @@ docker login ghcr.io
 ### 3) Build and push
 
 ```bash
-docker build -t "$IMAGE:$TAG" -t "$IMAGE:latest" .
-docker push "$IMAGE:$TAG"
-docker push "$IMAGE:latest"
+docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:latest" .
+docker push "${IMAGE}:${TAG}"
+docker push "${IMAGE}:latest"
 ```
 
 ### 4) Verify published tags
 
 ```bash
-docker pull "$IMAGE:$TAG"
-docker pull "$IMAGE:latest"
+docker pull "${IMAGE}:${TAG}"
+docker pull "${IMAGE}:latest"
 ```
 
 ## Team Consumer Workflow (Pull + Run)

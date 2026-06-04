@@ -68,8 +68,8 @@ cd /Users/davidpolizzi/Development/docker/text-to-zensical
 export IMAGE=ghcr.io/<your-org>/text-to-zensical
 export TAG=v1.0.0
 
-docker build -t "$IMAGE:$TAG" .
-docker push "$IMAGE:$TAG"
+docker build -t "${IMAGE}:${TAG}" .
+docker push "${IMAGE}:${TAG}"
 ```
 
 #### User workflow (run published release)

@@ -1,6 +1,6 @@
 services:
   text-to-zensical:
-    image: ${TEXT_TO_ZENSICAL_IMAGE:-ghcr.io/your-org/text-to-zensical}:${TEXT_TO_ZENSICAL_TAG:-latest}
+    image: ${TEXT_TO_ZENSICAL_IMAGE:-ghcr.io/el-dragon-1/text-to-zensical}:${TEXT_TO_ZENSICAL_TAG:-latest}
     container_name: text-to-zensical
     ports:
       - "${PORT:-10253}:8000"
