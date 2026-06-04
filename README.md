@@ -55,7 +55,6 @@ Use Docker image distribution as the default sharing model.
 - The release compose file includes lightweight container hardening:
   - `no-new-privileges`
   - dropped Linux capabilities
-  - `tmpfs` mount for `/tmp`
 
 ### 3) Release/Startup Instructions
 
@@ -63,19 +62,12 @@ Use Docker image distribution as the default sharing model.
 
 ```bash
 cd /Users/davidpolizzi/Development/docker/text-to-zensical
-
-export IMAGE=ghcr.io/el-dragon-1/text-to-zensical
 export TAG=v1.0.0
 
 docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:latest" .
-docker push "${IMAGE}:${TAG}"
-docker push "${IMAGE}:latest"
 ```
 
 #### User workflow (run published release)
-
-```bash
-cd /Users/davidpolizzi/Development/docker/text-to-zensical
 cp .env.example .env
 
 # Edit .env with your published image and a strong SECRET_KEY.
@@ -133,6 +125,7 @@ docker compose down
 
 ## Local Python Run (Optional)
 
+   In repository Settings -> Secrets and variables -> Actions, create secret `GHCR_PAT` (classic PAT with `write:packages` and `read:packages`).
 ```bash
 cd /Users/davidpolizzi/Development/docker/text-to-zensical
 python3 -m venv .venv
