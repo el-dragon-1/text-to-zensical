@@ -64,12 +64,12 @@ Use Docker image distribution as the default sharing model.
 ```bash
 cd /Users/davidpolizzi/Development/docker/text-to-zensical
 
-# Example for GHCR. Replace these values.
-export IMAGE=ghcr.io/<your-org>/text-to-zensical
+export IMAGE=ghcr.io/el-dragon-1/text-to-zensical
 export TAG=v1.0.0
 
-docker build -t "$IMAGE:$TAG" .
-docker push "$IMAGE:$TAG"
+docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:latest" .
+docker push "${IMAGE}:${TAG}"
+docker push "${IMAGE}:latest"
 ```
 
 #### User workflow (run published release)
@@ -107,6 +107,8 @@ docker compose -f docker-compose.release.yml down
 cd /Users/davidpolizzi/Development/docker/text-to-zensical
 docker compose up --build
 ```
+
+If the workflow fails with `permission_denied: write_package`, open the GHCR package settings for `text-to-zensical` and grant this repository write access under Actions access.
 
 Use a different host port if needed:
 
