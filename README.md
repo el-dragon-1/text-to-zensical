@@ -4,7 +4,7 @@ Browser-based tool for collecting text and dropped images, then creating a singl
 
 ## Features
 
-- Paste or type freeform text.
+- Paste or type freeform text directly into the text area. 
 - Use the clean right-side toolbar with a Headers dropdown (H1-H6), plus Bold and Italic tools.
 - Use the Line Break button under Insert Admonition to insert `---` followed by two returns at the cursor.
 - Main editor and Preview page share a Zensical modern-style visual theme.
@@ -68,8 +68,8 @@ cd /Users/davidpolizzi/Development/docker/text-to-zensical
 export IMAGE=ghcr.io/<your-org>/text-to-zensical
 export TAG=v1.0.0
 
-docker build -t "${IMAGE}:${TAG}" .
-docker push "${IMAGE}:${TAG}"
+docker build -t "$IMAGE:$TAG" .
+docker push "$IMAGE:$TAG"
 ```
 
 #### User workflow (run published release)
