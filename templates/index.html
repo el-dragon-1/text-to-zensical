@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text to Zensical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <a class="docs-link secondary" href="{{ url_for('documentation_page') }}" target="_blank" rel="noopener noreferrer">
+      Documentation
+    </a>
+    <main class="shell workspace-shell">
+      <aside class="project-sidebar">
+        <div class="project-sidebar-header">
+          <div>
+            <p class="toolbar-title">Projects</p>
+            <h2>Saved Work</h2>
+          </div>
+          <form method="post" action="{{ url_for('create_project') }}">
+            <button type="submit" class="secondary sidebar-action">New</button>
+          </form>
+        </div>
+
+        <nav class="project-list" aria-label="Saved projects">
+          {% if projects %}
+            {% for project in projects %}
+              <article class="project-item {% if project.name == active_project %}active{% endif %}">
+                <a class="project-link" href="{{ url_for('index', project=project.name) }}">
+                  {% if project.thumbnail_url %}
+                    <img class="project-thumb" src="{{ project.thumbnail_url }}" alt="Thumbnail for {{ project.name }}" loading="lazy" />
+                  {% else %}
+                    <div class="project-thumb project-thumb-placeholder" aria-hidden="true">No image</div>
+                  {% endif %}
+                  <span class="project-name">{{ project.name }}</span>
+                  <span class="project-preview">{{ project.preview }}</span>
+                  <span class="project-meta">{{ project.modified }} · {{ project.image_count }} images</span>
+                </a>
+
+                <div class="project-actions">
+                  <form method="post" action="{{ url_for('rename_project') }}" class="rename-form">
+                    <input type="hidden" name="current_name" value="{{ project.name }}" />
+                    <input type="text" name="new_name" value="{{ project.name }}" aria-label="Rename {{ project.name }}" />
+                    <button type="submit" class="action-button">Rename</button>
+                  </form>
+
+                  <form method="post" action="{{ url_for('delete_project') }}" onsubmit="return confirm('Delete project {{ project.name }}? This cannot be undone.');">
+                    <input type="hidden" name="project_name" value="{{ project.name }}" />
+                    <button type="submit" class="action-button danger">Delete</button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
+          {% else %}
+            <p class="empty-state">No saved projects yet.</p>
+          {% endif %}
+        </nav>
+      </aside>
+
+      <section class="card editor-card">
+        <h1>Text to Zensical</h1>
+        <p class="subtitle">Drop images from your desktop, add text, and generate one markdown export folder.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% endwith %}
+
+        <form method="post" action="{{ url_for('generate') }}" enctype="multipart/form-data" class="generator-form">
+          <input type="hidden" name="project_name" value="{{ active_project }}" />
+          <label for="source_text">Source Text</label>
+          <div class="editor-layout">
+            <textarea id="source_text" name="source_text" rows="10" placeholder="Paste or type text here...">{{ source_text | e }}</textarea>
+            <div class="toolbar-wrap">
+              <p class="toolbar-title">Formatting</p>
+              <div class="toolbar" role="toolbar" aria-label="Markdown formatting">
+                <select id="header-select" class="tool-select" aria-label="Headers">
+                  <option value="">Headers</option>
+                  <option value="1">Header 1</option>
+                  <option value="2">Header 2</option>
+                  <option value="3">Header 3</option>
+                  <option value="4">Header 4</option>
+                  <option value="5">Header 5</option>
+                  <option value="6">Header 6</option>
+                </select>
+                <button type="button" class="tool-button" data-action="bold"><strong>B</strong></button>
+                <button type="button" class="tool-button" data-action="italic"><em>I</em></button>
+              </div>
+
+              <button type="button" id="upload-toggle" class="secondary upload-toggle" aria-expanded="false" aria-controls="upload-panel">
+                Image Upload
+              </button>
+              <button type="button" id="admonition-toggle" class="secondary upload-toggle" aria-expanded="false" aria-controls="admonition-panel">
+                Insert Admonition
+              </button>
+              <button type="button" id="linebreak-toggle" class="secondary upload-toggle">
+                Line Break
+              </button>
+            </div>
+          </div>
+
+          <div class="meta">
+            <span>Export root in container: <strong>{{ output_root }}</strong></span>
+          </div>
+
+          <div class="button-row">
+            <button id="save-action" type="submit" class="secondary" formaction="{{ url_for('save_project') }}" formmethod="post">Save Progress</button>
+            <button
+              id="preview-action"
+              type="button"
+              class="secondary"
+              data-save-url="{{ url_for('save_project') }}"
+            >
+              Preview Page
+            </button>
+            <button
+              id="preview-submit"
+              type="submit"
+              hidden
+              formaction="{{ url_for('preview_saved_project') }}"
+              formmethod="post"
+              formtarget="zensical_preview"
+              formenctype="application/x-www-form-urlencoded"
+            >
+              Open Preview
+            </button>
+            <button type="submit">Generate Export + Download ZIP</button>
+          </div>
+
+          <dialog id="upload-dialog" class="upload-dialog" aria-labelledby="upload-dialog-title">
+            <div class="upload-panel" id="upload-panel">
+              <h2 id="upload-dialog-title">Image Upload</h2>
+              <label class="upload-label" for="image-width">Image Width</label>
+              <input id="image-width" name="image-width" type="number" min="1" value="300" class="upload-input" />
+              <label class="upload-label" for="image-caption">Figure Caption</label>
+              <input id="image-caption" name="image-caption" type="text" class="upload-input" placeholder="Use {filename} placeholder or leave blank" />
+              <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop image files here or click to select">
+                <p>Drag image files from any desktop window and drop them here.</p>
+                <p>or click to browse</p>
+                <input id="images" name="images" type="file" accept="image/*" multiple />
+              </div>
+              <ul id="file-list" class="file-list"></ul>
+              <div class="dialog-actions">
+                <button type="button" id="upload-close" class="secondary">Done</button>
+              </div>
+            </div>
+          </dialog>
+
+          <dialog id="admonition-dialog" class="upload-dialog" aria-labelledby="admonition-dialog-title">
+            <div class="upload-panel admonition-panel" id="admonition-panel">
+              <h2 id="admonition-dialog-title">Insert Admonition</h2>
+              <label class="upload-label" for="admonition-type">Type</label>
+              <select id="admonition-type" class="upload-input">
+                <option value="note">note</option>
+                <option value="abstract">abstract</option>
+                <option value="info">info</option>
+                <option value="tip">tip</option>
+                <option value="success">success</option>
+                <option value="question">question</option>
+                <option value="warning">warning</option>
+                <option value="failure">failure</option>
+                <option value="danger">danger</option>
+                <option value="bug">bug</option>
+                <option value="example">example</option>
+                <option value="quote">quote</option>
+              </select>
+              <label class="upload-label" for="admonition-body">Body</label>
+              <textarea
+                id="admonition-body"
+                class="upload-input admonition-input"
+                rows="5"
+                placeholder="Body"
+              ></textarea>
+              <div class="dialog-actions">
+                <button type="button" id="admonition-close" class="secondary">Cancel</button>
+                <button type="button" id="admonition-insert">Insert</button>
+              </div>
+            </div>
+          </dialog>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const dropzone = document.getElementById('dropzone');
+      const input = document.getElementById('images');
+      const list = document.getElementById('file-list');
+      const uploadToggle = document.getElementById('upload-toggle');
+      const uploadDialog = document.getElementById('upload-dialog');
+      const uploadClose = document.getElementById('upload-close');
+      const admonitionToggle = document.getElementById('admonition-toggle');
+      const lineBreakToggle = document.getElementById('linebreak-toggle');
+      const admonitionDialog = document.getElementById('admonition-dialog');
+      const admonitionClose = document.getElementById('admonition-close');
+      const admonitionInsert = document.getElementById('admonition-insert');
+      const admonitionType = document.getElementById('admonition-type');
+      const admonitionBody = document.getElementById('admonition-body');
+      const previewAction = document.getElementById('preview-action');
+      const previewSubmit = document.getElementById('preview-submit');
+      const saveAction = document.getElementById('save-action');
+      const headerSelect = document.getElementById('header-select');
+      const toolbarButtons = document.querySelectorAll('.tool-button');
+      const sourceText = document.getElementById('source_text');
+      const generatorForm = sourceText.closest('form');
+      const widthInput = document.getElementById('image-width');
+      const captionInput = document.getElementById('image-caption');
+      const activeProjectInput = generatorForm.querySelector('input[name="project_name"]');
+      const editorScrollKey = 'zensical_editor_scroll_state';
+
+      let selectedFiles = [];
+      let cursorStart = 0;
+      let cursorEnd = 0;
+
+      function captureEditorScrollState() {
+        const project = (activeProjectInput?.value || '').trim();
+        return {
+          project,
+          pageX: window.scrollX,
+          pageY: window.scrollY,
+          textScrollTop: sourceText.scrollTop,
+          textSelectionStart: sourceText.selectionStart,
+          textSelectionEnd: sourceText.selectionEnd,
+          timestamp: Date.now(),
+        };
+      }
+
+      function restoreEditorScrollState() {
+        const raw = sessionStorage.getItem(editorScrollKey);
+        if (!raw) {
+          return;
+        }
+
+        let state;
+        try {
+          state = JSON.parse(raw);
+        } catch (_error) {
+          sessionStorage.removeItem(editorScrollKey);
+          return;
+        }
+
+        const currentProject = (activeProjectInput?.value || '').trim();
+        const isSameProject = !state.project || state.project === currentProject;
+        const isFresh = Number.isFinite(state.timestamp) && Date.now() - state.timestamp < 30000;
+        if (!isSameProject || !isFresh) {
+          sessionStorage.removeItem(editorScrollKey);
+          return;
+        }
+
+        const applyRestore = () => {
+          window.scrollTo(state.pageX || 0, state.pageY || 0);
+          sourceText.scrollTop = state.textScrollTop || 0;
+
+          const maxIndex = sourceText.value.length;
+          const start = Math.max(0, Math.min(maxIndex, Number(state.textSelectionStart) || 0));
+          const end = Math.max(0, Math.min(maxIndex, Number(state.textSelectionEnd) || start));
+          sourceText.selectionStart = start;
+          sourceText.selectionEnd = end;
+        };
+
+        requestAnimationFrame(applyRestore);
+        setTimeout(applyRestore, 100);
+        sessionStorage.removeItem(editorScrollKey);
+      }
+
+      restoreEditorScrollState();
+
+      function previewUrlFromProject() {
+        const project = (activeProjectInput?.value || '').trim();
+        if (!project) {
+          return null;
+        }
+        return `/preview/saved?project=${encodeURIComponent(project)}`;
+      }
+
+      function sanitizeFileName(name) {
+        return name
+          .replace(/[^a-zA-Z0-9._-]+/g, '-')
+          .replace(/^-+/, '')
+          .replace(/-+$/, '') || 'image';
+      }
+
+      function dedupeName(baseName) {
+        const existing = new Set(selectedFiles.map((f) => f.name.toLowerCase()));
+        let candidate = baseName;
+        const dot = baseName.lastIndexOf('.');
+        const stem = dot === -1 ? baseName : baseName.slice(0, dot);
+        const suffix = dot === -1 ? '' : baseName.slice(dot);
+        let index = 1;
+        while (existing.has(candidate.toLowerCase())) {
+          candidate = `${stem}-${index}${suffix}`;
+          index += 1;
+        }
+        return candidate;
+      }
+
+      function insertAtCursor(snippet) {
+        const value = sourceText.value;
+        const start = sourceText.selectionStart;
+        const end = sourceText.selectionEnd;
+        sourceText.value = value.slice(0, start) + snippet + value.slice(end);
+        const nextPos = start + snippet.length;
+        sourceText.selectionStart = nextPos;
+        sourceText.selectionEnd = nextPos;
+        sourceText.focus();
+      }
+
+      function insertBlockAtCursor(block) {
+        const value = sourceText.value;
+        const start = sourceText.selectionStart;
+        const end = sourceText.selectionEnd;
+        const before = value.slice(0, start);
+        const after = value.slice(end);
+
+        let leading = '';
+        if (before.length > 0) {
+          if (before.endsWith('\n\n')) {
+            leading = '';
+          } else if (before.endsWith('\n')) {
+            leading = '\n';
+          } else {
+            leading = '\n\n';
+          }
+        }
+
+        let trailing = '';
+        if (after.length > 0) {
+          if (after.startsWith('\n\n')) {
+            trailing = '';
+          } else if (after.startsWith('\n')) {
+            trailing = '\n';
+          } else {
+            trailing = '\n\n';
+          }
+        } else {
+          trailing = '\n';
+        }
+
+        const snippet = `${leading}${block}${trailing}`;
+        sourceText.value = before + snippet + after;
+        const nextPos = before.length + snippet.length;
+        sourceText.selectionStart = nextPos;
+        sourceText.selectionEnd = nextPos;
+        sourceText.focus();
+      }
+
+      function wrapSelection(prefix, suffix, placeholder) {
+        sourceText.focus();
+        const start = sourceText.selectionStart;
+        const end = sourceText.selectionEnd;
+        const value = sourceText.value;
+        const selected = value.slice(start, end) || placeholder;
+        const next = `${prefix}${selected}${suffix}`;
+        sourceText.value = value.slice(0, start) + next + value.slice(end);
+
+        if (end === start) {
+          const cursorPos = start + prefix.length + selected.length;
+          sourceText.selectionStart = cursorPos;
+          sourceText.selectionEnd = cursorPos;
+        } else {
+          sourceText.selectionStart = start;
+          sourceText.selectionEnd = start + next.length;
+        }
+
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+      }
+
+      function applyHeader(level) {
+        sourceText.focus();
+        const start = sourceText.selectionStart;
+        const end = sourceText.selectionEnd;
+        const value = sourceText.value;
+        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+        const lineEndIndex = value.indexOf('\n', end);
+        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+        const block = value.slice(lineStart, lineEnd);
+        const lines = block.split('\n');
+        const prefix = '#'.repeat(level) + ' ';
+        const updated = lines.map((line) => `${prefix}${line.replace(/^#{1,6}\s+/, '')}`).join('\n');
+
+        sourceText.value = value.slice(0, lineStart) + updated + value.slice(lineEnd);
+        sourceText.selectionStart = lineStart;
+        sourceText.selectionEnd = lineStart + updated.length;
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function figureSnippet(fileName, widthPx, captionText) {
+        const safeCaption = escapeHtml(captionText);
+        return `<figure markdown="span">\n  ![${fileName}](${fileName}){ width="${widthPx}" }\n  <figcaption>${safeCaption}</figcaption>\n</figure>`;
+      }
+
+      function admonitionSnippet(kind, bodyText) {
+        const allowedKinds = new Set([
+          'note',
+          'abstract',
+          'info',
+          'tip',
+          'success',
+          'question',
+          'warning',
+          'failure',
+          'danger',
+          'bug',
+          'example',
+          'quote',
+        ]);
+
+        const type = allowedKinds.has(kind) ? kind : 'note';
+        const body = (bodyText || '').trim() || 'Body';
+        const indentedBody = body
+          .split(/\r?\n/)
+          .map((line) => `    ${line}`)
+          .join('\n');
+
+        return `!!! ${type}\n\n${indentedBody}`;
+      }
+
+      function getUploadWidth() {
+        const width = Math.max(1, Number(widthInput.value || 300));
+        return Number.isFinite(width) ? width : 300;
+      }
+
+      function getUploadCaption(fileName) {
+        const raw = (captionInput.value || '').trim();
+        if (!raw) {
+          return fileName;
+        }
+        return raw.replaceAll('{filename}', fileName);
+      }
+
+      toolbarButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const action = button.dataset.action;
+          if (!action) {
+            return;
+          }
+
+          if (action === 'bold') {
+            wrapSelection('**', '**', 'bold text');
+            return;
+          }
+
+          if (action === 'italic') {
+            wrapSelection('*', '*', 'italic text');
+          }
+        });
+      });
+
+      lineBreakToggle.addEventListener('click', () => {
+        insertAtCursor('---\n\n');
+      });
+
+      headerSelect.addEventListener('change', () => {
+        const level = Number(headerSelect.value);
+        if (!Number.isInteger(level) || level < 1 || level > 6) {
+          return;
+        }
+        applyHeader(level);
+        headerSelect.value = '';
+      });
+
+      function renderFiles() {
+        list.innerHTML = '';
+        if (!selectedFiles.length) {
+          return;
+        }
+        for (const file of selectedFiles) {
+          const item = document.createElement('li');
+          item.textContent = `${file.name} (${Math.round(file.file.size / 1024)} KB)`;
+          list.appendChild(item);
+        }
+      }
+
+      function syncInputFiles() {
+        const dt = new DataTransfer();
+        for (const entry of selectedFiles) {
+          dt.items.add(entry.file);
+        }
+        input.files = dt.files;
+      }
+
+      function queueFiles(fileList) {
+        for (const file of fileList) {
+          if (file.type.startsWith('image/')) {
+            commitFile(file);
+          }
+        }
+      }
+
+      function commitFile(file) {
+        const safeName = dedupeName(sanitizeFileName(file.name));
+        const widthValue = getUploadWidth();
+        const captionText = getUploadCaption(safeName);
+
+        selectedFiles.push({ name: safeName, file: new File([file], safeName, { type: file.type }) });
+        syncInputFiles();
+        renderFiles();
+
+        sourceText.focus();
+        sourceText.selectionStart = cursorStart;
+        sourceText.selectionEnd = cursorEnd;
+        insertBlockAtCursor(figureSnippet(safeName, widthValue, captionText));
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+      }
+
+      uploadToggle.addEventListener('click', () => {
+        uploadDialog.showModal();
+        uploadToggle.setAttribute('aria-expanded', 'true');
+      });
+
+      uploadClose.addEventListener('click', () => {
+        uploadDialog.close();
+        uploadToggle.setAttribute('aria-expanded', 'false');
+      });
+
+      uploadDialog.addEventListener('close', () => {
+        uploadToggle.setAttribute('aria-expanded', 'false');
+      });
+
+      admonitionToggle.addEventListener('click', () => {
+        admonitionDialog.showModal();
+        admonitionToggle.setAttribute('aria-expanded', 'true');
+        admonitionType.focus();
+      });
+
+      admonitionClose.addEventListener('click', () => {
+        admonitionDialog.close();
+        admonitionToggle.setAttribute('aria-expanded', 'false');
+      });
+
+      admonitionDialog.addEventListener('close', () => {
+        admonitionToggle.setAttribute('aria-expanded', 'false');
+      });
+
+      admonitionInsert.addEventListener('click', () => {
+        const block = admonitionSnippet(admonitionType.value, admonitionBody.value);
+        sourceText.focus();
+        sourceText.selectionStart = cursorStart;
+        sourceText.selectionEnd = cursorEnd;
+        insertBlockAtCursor(block);
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+        admonitionDialog.close();
+      });
+
+      previewAction.addEventListener('click', async () => {
+        const saveUrl = previewAction.dataset.saveUrl;
+        if (!saveUrl || !generatorForm) {
+          return;
+        }
+
+        previewAction.disabled = true;
+        const originalLabel = previewAction.textContent;
+        previewAction.textContent = 'Saving...';
+
+        try {
+          const formData = new FormData(generatorForm);
+          await fetch(saveUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+          });
+          const previewUrl = previewUrlFromProject();
+          if (!previewUrl) {
+            alert('Select a project before opening preview.');
+            return;
+          }
+          localStorage.setItem('zensical_preview_open', '1');
+          window.open(previewUrl, 'zensical_preview');
+        } catch (_error) {
+          alert('Unable to save before preview. Please try again.');
+        } finally {
+          previewAction.disabled = false;
+          previewAction.textContent = originalLabel;
+        }
+      });
+
+      generatorForm.addEventListener('submit', (event) => {
+        if (event.submitter === saveAction) {
+          sessionStorage.setItem(editorScrollKey, JSON.stringify(captureEditorScrollState()));
+        }
+      });
+
+      sourceText.addEventListener('click', () => {
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+      });
+
+      sourceText.addEventListener('keyup', () => {
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+      });
+
+      sourceText.addEventListener('select', () => {
+        cursorStart = sourceText.selectionStart;
+        cursorEnd = sourceText.selectionEnd;
+      });
+
+      dropzone.addEventListener('click', () => input.click());
+      dropzone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          input.click();
+        }
+      });
+
+      dropzone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        dropzone.classList.add('drag-over');
+      });
+
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('drag-over');
+      });
+
+      dropzone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dropzone.classList.remove('drag-over');
+        if (event.dataTransfer?.files) {
+          queueFiles(event.dataTransfer.files);
+        }
+      });
+
+      input.addEventListener('change', () => {
+        queueFiles(input.files || []);
+      });
+    </script>
+  </body>
+</html>

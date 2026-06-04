@@ -1,0 +1,12 @@
+services:
+  text-to-zensical:
+    build: .
+    container_name: text-to-zensical
+    ports:
+      - "${PORT:-10253}:8000"
+    environment:
+      - OUTPUT_ROOT=/data/exports
+      - SECRET_KEY=replace-me
+    volumes:
+      - ./exports:/data/exports
+    restart: unless-stopped

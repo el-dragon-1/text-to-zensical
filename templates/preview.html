@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview - {{ project_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <main class="preview-shell">
+      <section class="card preview-card">
+        <p class="toolbar-title">Preview</p>
+        <h1>{{ project_name }}</h1>
+        <p class="subtitle">Static markdown render for progress tracking.</p>
+        <article
+          class="markdown-preview"
+          id="markdown-preview"
+          data-auto-refresh="{{ 'true' if auto_refresh else 'false' }}"
+          data-refresh-url="{{ refresh_url or '' }}"
+        >{{ rendered_html | safe }}</article>
+      </section>
+    </main>
+    <script>
+      const preview = document.getElementById('markdown-preview');
+      if (!preview) {
+        throw new Error('Preview container not found');
+      }
+
+      const autoRefresh = preview.dataset.autoRefresh === 'true';
+      const refreshUrl = preview.dataset.refreshUrl;
+      let lastHtml = preview.innerHTML;
+
+      function captureScrollState() {
+        const docHeight = document.documentElement.scrollHeight;
+        const maxScroll = Math.max(1, docHeight - window.innerHeight);
+        const scrollTop = window.scrollY;
+        const distanceFromBottom = docHeight - (scrollTop + window.innerHeight);
+
+        return {
+          left: window.scrollX,
+          top: scrollTop,
+          ratio: scrollTop / maxScroll,
+          distanceFromBottom,
+          nearBottom: distanceFromBottom <= 64,
+        };
+      }
+
+      function restoreScrollState(state) {
+        const docHeight = document.documentElement.scrollHeight;
+        const maxScroll = Math.max(0, docHeight - window.innerHeight);
+        let targetTop;
+
+        if (state.nearBottom) {
+          targetTop = Math.max(0, docHeight - window.innerHeight - Math.max(0, state.distanceFromBottom));
+        } else {
+          targetTop = Math.round(state.ratio * maxScroll);
+        }
+
+        window.scrollTo(state.left, targetTop);
+      }
+
+      function restoreAfterReflow(state) {
+        restoreScrollState(state);
+        requestAnimationFrame(() => restoreScrollState(state));
+        setTimeout(() => restoreScrollState(state), 120);
+
+        const images = preview.querySelectorAll('img');
+        for (const image of images) {
+          if (!image.complete) {
+            image.addEventListener('load', () => restoreScrollState(state), { once: true });
+          }
+        }
+      }
+
+      if (autoRefresh && refreshUrl) {
+        setInterval(async () => {
+          try {
+            const response = await fetch(refreshUrl, {
+              cache: 'no-store',
+              credentials: 'same-origin',
+            });
+            if (!response.ok) {
+              return;
+            }
+
+            const payload = await response.json();
+            const nextHtml = payload?.rendered_html;
+            if (typeof nextHtml !== 'string' || nextHtml === lastHtml) {
+              return;
+            }
+
+            const scrollState = captureScrollState();
+            preview.innerHTML = nextHtml;
+            lastHtml = nextHtml;
+            restoreAfterReflow(scrollState);
+          } catch (_error) {
+            // Ignore transient network errors while polling.
+          }
+        }, 3000);
+      }
+    </script>
+  </body>
+</html>
