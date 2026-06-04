@@ -1,148 +1,89 @@
 # Text to Zensical
 
-Browser-based tool for collecting text and dropped images, then creating a single export directory with markdown output.
-
-## Features
-
-- Paste or type freeform text directly into the text area. 
-- Use the clean right-side toolbar with a Headers dropdown (H1-H6), plus Bold and Italic tools.
-- Use the Line Break button under Insert Admonition to insert `---` followed by two returns at the cursor.
-- Main editor and Preview page share a Zensical modern-style visual theme.
-- Use "Preview Page" in the bottom action row to auto-save, then open a static markdown preview in a new tab.
-- Preview reuses one browser tab for the active project.
-- Saved project previews auto-refresh every 3 seconds with in-place updates and scroll anchoring so users stay near their current reading position.
-- Save Progress preserves editor page and source text scroll position after the save redirect.
-- Use the top-right "Documentation" button to open a rendered preview of this README in a new tab.
-- Use the right-side "Image Upload" button to open an overlay prompt with drag/drop plus image width and caption inputs.
-- Use the right-side "Insert Admonition" button to open an overlay with type selection and body text for markdown admonition blocks.
-- Admonition blocks now render in Preview using markdown admonition extensions.
-- Upload settings apply directly when inserting image markdown from dropped/selected files.
-- Images are inserted into the text area at the current cursor position using markdown figure syntax.
-- Inserted figure blocks are automatically spaced with clean blank lines around them.
-- Switch between saved projects from the left-side project directory.
-- Rename and delete projects from the left-side project directory.
-- View project thumbnail previews from saved images in the project list.
-- Save Progress stores work to the active project without downloading a ZIP.
-- Save/Export actions are docked at the bottom-right for quick access while editing.
-- Generate one timestamped directory that contains:
-  - `content.md` with your exact text area content and image blocks where you placed them.
-  - copied image files in the same project root as `content.md`.
-- Download a ZIP of the generated directory immediately after export.
-- Handles duplicate filenames by appending numeric suffixes.
+Browser-based tool for writing markdown content and collecting images, then exporting everything as a tidy, shareable directory.
 
 ## Requirements
 
-- Docker + Docker Compose
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
 
-## Share With Other Users
+## Getting Started
 
-Use Docker image distribution as the default sharing model.
+You will need two files in the same folder on your computer:
 
-### Team Handoff Pack
+- `docker-compose.yml` — provided by your administrator
+- `.env` — provided by your administrator (contains your secret key and port)
 
-- `TEAM_HANDOFF.md` contains publisher and team consumer copy/paste steps.
-- `.env.team.example` is the recommended team runtime template for release deployments.
-- The GitHub Actions publish workflow pushes multi-architecture GHCR images for `linux/amd64` and `linux/arm64`.
-
-### 1) Production Compose File (Image-Based)
-
-- `docker-compose.release.yml` runs from a published image tag (no local source build required).
-- `.env.example` provides runtime variables and security defaults.
-
-### 2) Environment Template And Security Defaults
-
-- Copy `.env.example` to `.env`.
-- `TEXT_TO_ZENSICAL_TAG` defaults to `latest` in templates for easiest team onboarding.
-- Data persistence is stored in the host-mounted `./exports` folder and remains available across image upgrades when that mount path is unchanged.
-- Pin a version tag instead of `latest` if you need strict reproducibility or rollback control.
-- Set a strong `SECRET_KEY` before sharing or deployment.
-- The release compose file includes lightweight container hardening:
-  - `no-new-privileges`
-  - dropped Linux capabilities
-
-### 3) Release/Startup Instructions
-
-#### Publisher workflow (build and publish image)
+Open a terminal, navigate to that folder, and run:
 
 ```bash
-cd /Users/davidpolizzi/Development/docker/text-to-zensical
-export TAG=v1.0.0
-
-docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:latest" .
+docker compose up -d
 ```
 
-#### User workflow (run published release)
-cp .env.example .env
+Then open your browser and go to:
 
-# Edit .env with your published image and a strong SECRET_KEY.
-docker compose -f docker-compose.release.yml up -d
 ```
-
-Then open:
-
-```bash
 http://localhost:10253
 ```
 
-Use a different host port if needed:
+That's it. The app is running.
 
-```bash
-PORT=8000 docker compose -f docker-compose.release.yml up -d
-# then open http://localhost:8000
-```
-
-Stop:
-
-```bash
-docker compose -f docker-compose.release.yml down
-```
-
-## Run With Docker
-
-```bash
-cd /Users/davidpolizzi/Development/docker/text-to-zensical
-docker compose up --build
-```
-
-If the workflow fails with `permission_denied: write_package`, open the GHCR package settings for `text-to-zensical` and grant this repository write access under Actions access.
-
-Use a different host port if needed:
-
-```bash
-PORT=8000 docker compose up --build
-# then open http://localhost:8000
-```
-
-Then open:
-
-```bash
-http://localhost:10253
-```
-
-Generated project folders are persisted on your host at `./exports`, and the left sidebar lets you switch between them.
-
-## Stop
+## Stopping the App
 
 ```bash
 docker compose down
 ```
 
-## Local Python Run (Optional)
+## Updating to the Latest Version
 
-   In repository Settings -> Secrets and variables -> Actions, create secret `GHCR_PAT` (classic PAT with `write:packages` and `read:packages`).
 ```bash
-cd /Users/davidpolizzi/Development/docker/text-to-zensical
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
+docker compose pull
+docker compose up -d
 ```
+
+Your existing projects and saved content are not affected by updates.
+
+## Using the App
+
+### Projects
+
+- The left sidebar lists all your saved projects.
+- Click **New Project** to start a fresh one.
+- Click any project name to switch to it.
+- Use the rename and delete controls in the sidebar to manage projects.
+
+### Writing
+
+- Type or paste markdown directly into the editor.
+- Use the right-side toolbar to insert **Headers** (H1–H6), **Bold**, and **Italic** formatting.
+- Use **Insert Admonition** to add a styled callout block (note, warning, tip, etc.).
+- Use the **Line Break** button under Insert Admonition to insert a horizontal rule followed by spacing.
+
+### Images
+
+- Click **Image Upload** on the right toolbar to open the image overlay.
+- Drag and drop an image file or click to select one.
+- Set an optional width and caption before inserting.
+- The image is inserted at your cursor position as a markdown figure block.
+
+### Saving
+
+- Click **Save Progress** to save the current editor content to your active project without downloading anything.
+- Your scroll position and cursor location are preserved after saving.
+
+### Preview
+
+- Click **Preview Page** to save and open a live rendered preview of your content in a new browser tab.
+- The preview tab refreshes automatically every 3 seconds as you continue editing and saving.
+- Scroll position in the preview is maintained across refreshes.
+
+### Export
+
+- Click **Generate + Download** to export your project as a ZIP file.
+- The ZIP contains `content.md` and all associated images in a single timestamped folder.
 
 ## Output Format
 
-The app creates a folder named like `zensical-export-YYYYMMDD-HHMMSS` under the output root (`/data/exports` in the container, mapped to `./exports` on host).
-
-Example structure:
+Exported folders are structured like this:
 
 ```text
 zensical-export-20260603-121314/
@@ -161,3 +102,7 @@ Your entered text goes here.
   <figcaption>Custom caption text</figcaption>
 </figure>
 ```
+
+## Data Persistence
+
+Your projects are saved in the `exports` folder inside your deployment directory. This folder is retained across app updates and restarts as long as you run Docker Compose from the same directory.
