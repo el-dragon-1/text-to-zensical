@@ -42,6 +42,7 @@ Use Docker image distribution as the default sharing model.
 
 - `TEAM_HANDOFF.md` contains publisher and team consumer copy/paste steps.
 - `.env.team.example` is the recommended team runtime template for release deployments.
+- The GitHub Actions publish workflow pushes multi-architecture GHCR images for `linux/amd64` and `linux/arm64`.
 
 ### 1) Production Compose File (Image-Based)
 
