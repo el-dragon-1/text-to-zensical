@@ -3,11 +3,25 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import tempfile
+import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import (
+    Flask,
+    abort,
+    after_this_request,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+    url_for,
+)
 from markdown import markdown
 from werkzeug.utils import secure_filename
 
@@ -189,7 +203,10 @@ def _create_export(project_dir: Path, raw_text: str, uploaded_images: list) -> t
 
 
 def _zip_export(export_dir: Path) -> Path:
-    zip_path = export_dir.with_suffix(".zip")
+    # Use a unique temp zip outside the bind mount to avoid host file-lock issues.
+    tmp_dir = Path(tempfile.gettempdir()) / "text-to-zensical"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = tmp_dir / f"{export_dir.name}-{uuid.uuid4().hex}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
         for child in export_dir.rglob("*"):
             archive.write(child, child.relative_to(export_dir))
@@ -342,16 +359,29 @@ def generate():
         flash("Add text or at least one image before generating.", "error")
         return redirect(url_for("index", project=project_name))
 
-    project_dir = _create_project(project_name)
-    export_dir, copied_count = _create_export(project_dir, raw_text, uploaded_images)
-    zip_path = _zip_export(export_dir)
+    try:
+        project_dir = _create_project(project_name)
+        export_dir, copied_count = _create_export(project_dir, raw_text, uploaded_images)
+        zip_path = _zip_export(export_dir)
+    except OSError as error:
+        app.logger.exception("Failed to prepare export")
+        flash(f"Failed to prepare export: {error}", "error")
+        return redirect(url_for("index", project=project_name))
+
+    @after_this_request
+    def cleanup_generated_zip(response):
+        try:
+            zip_path.unlink(missing_ok=True)
+        except OSError:
+            app.logger.warning("Failed to remove temporary ZIP: %s", zip_path)
+        return response
 
     flash(
         f"Project saved: {export_dir.name}. Images copied: {copied_count}. "
         f"Directory path: {export_dir}",
         "success",
     )
-    response = send_file(zip_path, as_attachment=True, download_name=zip_path.name)
+    response = send_file(zip_path, as_attachment=True, download_name=f"{export_dir.name}.zip")
     response.headers["X-Project-Name"] = export_dir.name
     return response
 

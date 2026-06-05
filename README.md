@@ -106,3 +106,51 @@ Your entered text goes here.
 ## Data Persistence
 
 Your projects are saved in the `exports` folder inside your deployment directory. This folder is retained across app updates and restarts as long as you run Docker Compose from the same directory.
+
+## Windows 11 Troubleshooting (Docker Desktop)
+
+If this works on macOS but fails on Windows 11, check these first:
+
+1. Use a local folder, not OneDrive/network storage
+
+- Run the app from a local path like `C:\Users\<you>\text-to-zensical`.
+- Avoid OneDrive-synced folders because file locking and sync latency can break bind mounts.
+
+2. Confirm the `exports` bind mount is writable
+
+```bash
+docker compose ps
+docker compose logs --tail=200 text-to-zensical
+```
+
+If logs show `PermissionError` or write failures under `/data/exports`, move the deployment folder to a normal local directory and restart.
+
+3. Validate `.env` formatting
+
+- Save `.env` as UTF-8 (no BOM).
+- Keep one `KEY=value` per line.
+- Do not wrap values in quotes unless needed.
+- Ensure `SECRET_KEY` is set to a non-empty value.
+
+4. Rebuild and restart cleanly
+
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+docker compose logs -f text-to-zensical
+```
+
+5. Check port conflicts
+
+If `10253` is already in use, set another port in `.env`:
+
+```env
+PORT=10254
+```
+
+Then open `http://localhost:10254`.
+
+6. If export/download fails intermittently
+
+Recent builds generate ZIP files in a temporary container path (instead of the bind mount) to avoid Windows host file-lock edge cases.
